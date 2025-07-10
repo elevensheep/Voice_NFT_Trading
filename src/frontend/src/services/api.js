@@ -267,9 +267,9 @@ class ApiService {
   // 카카오페이 관련 API
   kakaopay = {
     // 결제 준비
-    ready: (data) => this.post("/api/kakaopay/ready", data),
+    ready: (data) => this.post("/api/payment/ready", data),
     // 결제 승인 및 거래 등록
-    approve: (data) => this.post("/api/kakaopay/approve", data),
+    approve: (data) => this.post("/api/payment/approve", data),
   };
 }
 
