@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const kakaoController = require('../controllers/kakao.controller');
-const naverController = require('../controllers/naver.controller');
 const indexController = require('../controllers/index.controller');
 
 /**
@@ -40,49 +39,6 @@ router.get('/kakao', kakaoController.loginWithKakao);
  *         description: 로그인 처리 실패
  */
 router.get('/kakao/callback', kakaoController.handleKakaoCallback);
-
-/**
- * @swagger
- * /api/auth/naver:
- *   get:
- *     summary: 네이버 OAuth 로그인 시작
- *     tags:
- *       - Auth
- *     description: 사용자를 네이버 로그인 페이지로 리디렉트합니다.
- *     responses:
- *       302:
- *         description: 네이버 로그인 페이지로 리디렉션
- */
-router.get('/naver', naverController.loginWithNaver);
-
-/**
- * @swagger
- * /api/auth/naver/callback:
- *   get:
- *     summary: 네이버 OAuth 콜백 처리
- *     tags:
- *       - Auth
- *     description: 네이버 OAuth 인증 후 사용자 정보를 받아 처리하고 토큰을 발급합니다.
- *     parameters:
- *       - name: code
- *         in: query
- *         required: true
- *         description: 네이버에서 전달하는 인증 코드
- *         schema:
- *           type: string
- *       - name: state
- *         in: query
- *         required: true
- *         description: CSRF 방지를 위한 상태 토큰
- *         schema:
- *           type: string
- *     responses:
- *       302:
- *         description: 프론트엔드로 토큰과 함께 리디렉트
- *       500:
- *         description: 인증 처리 실패
- */
-router.get('/naver/callback', naverController.handleNaverCallback);
 
 /**
  * @swagger

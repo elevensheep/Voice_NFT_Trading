@@ -1,12 +1,11 @@
 require("dotenv").config();
 const express = require("express");
 const dotenv = require("dotenv");
-const mongoose = require("./oauth/utils/db");
+const mongoose = require("./utils/db");
 
 const authRoutes = require('./oauth/routes/auth.routes');
 const nftRoutes = require('./NFT/routes/nft.routes');
 const userRoutes = require('./oauth/routes/user.routes');
-const paymentRoutes = require('./payment/routes/kakaoPay.routes');
 const cors = require('cors');
 
 // Swagger 설정
@@ -34,7 +33,6 @@ console.log("userRoutes:", typeof userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/nft", nftRoutes);
 app.use("/api/user", userRoutes);
-app.use("/api/payment", paymentRoutes);
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
