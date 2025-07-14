@@ -1,5 +1,4 @@
 const { getKakaoToken, getKakaoUserInfo } = require('../services/kakaoAuth.service');
-const User = require('../models/User.model');
 const { generateToken } = require('../utils/jwt');
 const jwt = require('jsonwebtoken');
 
