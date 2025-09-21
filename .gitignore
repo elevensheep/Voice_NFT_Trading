@@ -1,24 +1,8 @@
-# dependencies
+# Dependencies
 node_modules/
 package-lock.json
-
-# builds
-dist/
-build/
-*.log
-
-# TypeScript
-*.tsbuildinfo
-
-# source maps
-*.map
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
+yarn.lock
+.pnpm-debug.log*
 
 # Environment variables
 .env
@@ -26,11 +10,124 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.staging
 
-# archives
-*.zip
+# Build outputs
+build/
+dist/
+out/
+.next/
+.nuxt/
 
-# Python virtual environment
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory
+coverage/
+*.lcov
+.nyc_output
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
 venv39/
-
+ENV/
+env/
+.venv/
 .env/
+env.bak/
+venv.bak/
+
+# Flask
+instance/
+.webassets-cache
+
+# Audio files (generated outputs)
+*.wav
+*.mp3
+*.flac
+*.aac
+*.ogg
+
+# Model files and checkpoints
+*.pth
+*.pt
+*.ckpt
+pretrained_models/
+checkpoints/
+
+# TTS specific
+.gradio/
+results/
+demo/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# JWT keys and secrets
+private_key.pem
+public_key.pem
+
+# OAuth tokens
+tokens/
+.oauth_tokens
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Backup files
+*.bak
+*.backup
+
+# Test files
+test_output/
