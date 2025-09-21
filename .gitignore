@@ -32,3 +32,5 @@ build/
 
 # Python virtual environment
 venv39/
+
+.env/
