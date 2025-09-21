@@ -1,40 +1,97 @@
 require("dotenv").config();
 const express = require("express");
-const dotenv = require("dotenv");
-const mongoose = require("./utils/db");
-
-const authRoutes = require('./oauth/routes/auth.routes');
-const nftRoutes = require('./NFT/routes/nft.routes');
-const userRoutes = require('./oauth/routes/user.routes');
 const cors = require('cors');
+const { dbConnection } = require("./utils/db");
+const config = require('./config');
 
-// Swagger 설정
+// Import routes
+const authRoutes = require('./auth/routes/auth.routes');
+const marketplaceRoutes = require('./marketplace/api/routes/marketplace.routes');
+const userRoutes = require('./auth/routes/user.routes');
+const voiceRoutes = require('./voice/routes/voice.routes');
+
+// Import middleware
+const errorHandler = require('./middleware/errorHandler');
+
+// Import Swagger configuration
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./utils/swagger');
 
 const app = express();
-app.use(
-  cors({
-    origin: "http://localhost:3000", // 프론트엔드 주소
-    credentials: true, // 쿠키 포함하려면 true
-  })
-);
 
+// CORS configuration
+app.use(cors(config.cors));
+
+// Body parsing middleware
+app.use(express.json({ limit: config.upload.maxFileSize }));
+app.use(express.urlencoded({ extended: true, limit: config.upload.maxFileSize }));
+
+// Swagger documentation
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
+// API routes
 app.use("/api/auth", authRoutes);
-console.log("authRoutes:", typeof authRoutes);
-console.log("nftRoutes:", typeof nftRoutes);
-console.log("userRoutes:", typeof userRoutes);
-
-app.use("/api/auth", authRoutes);
-app.use("/api/nft", nftRoutes);
+app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/voice", voiceRoutes);
 
-const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
 });
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ 
+    success: false, 
+    message: 'Route not found' 
+  });
+});
+
+// Global error handler
+app.use(errorHandler);
+
+// Initialize server
+const startServer = async () => {
+  try {
+    // Validate configuration
+    config.validateConfig();
+    
+    // Connect to database
+    await dbConnection.connect();
+    
+    // Start server
+    const PORT = config.server.port;
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+      console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
+      console.log(`🌍 Environment: ${config.server.env}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+// Graceful shutdown
+const gracefulShutdown = async (signal) => {
+  console.log(`${signal} received. Shutting down gracefully...`);
+  try {
+    await dbConnection.disconnect();
+    console.log('✅ Server shut down successfully');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Start the server
+startServer();

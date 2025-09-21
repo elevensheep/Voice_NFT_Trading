@@ -1,21 +1,57 @@
 from flask import Flask, request, send_file, jsonify
-from transformers import AutoTokenizer
-from datetime import datetime
 from flask_cors import CORS
+from flask_restx import Api, Resource, fields, Namespace
 import os
 import torch
 import soundfile as sf
 import platform
 from pydub import AudioSegment
-from flask import send_from_directory
 import tempfile
+from datetime import datetime
 
 from cli.SparkTTS import SparkTTS
-from sparktts.utils.token_parser import LEVELS_MAP_UI
 
 app = Flask(__name__)
 CORS(app)
 
+# Swagger API 설정
+api = Api(
+    app, 
+    version='1.0', 
+    title='Voice NFT Trading Platform - TTS API',
+    description='Text-to-Speech API for Voice NFT Trading Platform',
+    doc='/swagger/',
+    prefix='/api'
+)
+
+# 네임스페이스 생성
+ns = api.namespace('tts', description='Text-to-Speech operations')
+
+# API 모델 정의
+upload_model = api.model('UploadPrompt', {
+    'user_id': fields.String(required=True, description='User ID for voice cloning'),
+    'prompt_speech': fields.Raw(required=True, description='Audio file for voice prompt')
+})
+
+voice_clone_model = api.model('VoiceClone', {
+    'user_id': fields.String(required=True, description='User ID'),
+    'text': fields.String(required=True, description='Text to convert to speech')
+})
+
+voice_list_model = api.model('VoiceList', {
+    'user_id': fields.String(required=True, description='User ID to get voice list for')
+})
+
+response_model = api.model('Response', {
+    'message': fields.String(description='Response message'),
+    'error': fields.String(description='Error message')
+})
+
+voice_list_response = api.model('VoiceListResponse', {
+    'voices': fields.List(fields.String, description='List of voice file URLs')
+})
+
+# Device configuration
 if platform.system() == "Darwin":
     device = torch.device("mps:0")
 elif torch.cuda.is_available():
@@ -23,139 +59,143 @@ elif torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-print(f"디바이스 설정 완료: {device}")
+print(f"Device: {device}")
 
+# Model initialization
 model_dir = "pretrained_models/Spark-TTS-0.5B"
-print("SparkTTS 모델 초기화 시작...")
+print("Initializing SparkTTS model...")
 try:
     model = SparkTTS(model_dir, device)
-    print("SparkTTS 모델 초기화 성공")
+    print("SparkTTS model initialized successfully")
 except Exception as e:
-    print(f"SparkTTS 모델 초기화 실패: {e}")
+    print(f"Failed to initialize SparkTTS model: {e}")
     exit(1)
 
-SAVE_DIR = "example/results"
-PROMPT_DIR = "example/prompts"
+# Directory setup
+SAVE_DIR = "results"
+PROMPT_DIR = "prompts"
 os.makedirs(SAVE_DIR, exist_ok=True)
 os.makedirs(PROMPT_DIR, exist_ok=True)
 
 def generate_tts(user_id, text, gender=None, pitch=None, speed=None):
+    """Generate TTS audio for given user and text"""
     prompt_path = os.path.join(PROMPT_DIR, f"{user_id}.wav")
     if not os.path.exists(prompt_path):
-        raise FileNotFoundError(f"User ID `{user_id}`에 대한 프롬프트 음성이 존재하지 않습니다.")
+        raise FileNotFoundError(f"Prompt audio for user ID `{user_id}` not found")
 
     with torch.no_grad():
-        print(f"TTS 생성 시작... [user_id: {user_id}]")
+        print(f"Generating TTS... [user_id: {user_id}]")
         wav = model.inference(text, prompt_path, gender, pitch, speed)
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         user_dir = os.path.join(SAVE_DIR, user_id)
         os.makedirs(user_dir, exist_ok=True)
         save_path = os.path.join(user_dir, f"{timestamp}.wav")
         sf.write(save_path, wav, samplerate=16000)
-        print(f"TTS 생성 완료: {save_path}")
+        print(f"TTS generation completed: {save_path}")
         return save_path
 
-@app.route("/upload-prompt", methods=["POST"])
-def upload_prompt():
-    user_id = request.form.get("user_id")
-    prompt_speech = request.files.get("prompt_speech")
+@ns.route('/upload-prompt')
+class UploadPrompt(Resource):
+    @ns.expect(upload_model)
+    @ns.marshal_with(response_model)
+    def post(self):
+        """Upload and process prompt audio for voice cloning"""
+        user_id = request.form.get("user_id")
+        prompt_speech = request.files.get("prompt_speech")
 
-    if not user_id or not prompt_speech:
-        return jsonify({"error": "user_id와 prompt_speech는 필수입니다."}), 400
+        if not user_id or not prompt_speech:
+            return {"error": "user_id and prompt_speech are required"}, 400
 
-    prompt_path = os.path.join(PROMPT_DIR, f"{user_id}.wav")
+        prompt_path = os.path.join(PROMPT_DIR, f"{user_id}.wav")
 
-    # if os.path.exists(prompt_path):
-    #     return jsonify({"error": "이미 프롬프트 음성이 등록되어 있습니다."}), 409
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".tmp") as tmp:
+            tmp_path = tmp.name
+            prompt_speech.save(tmp_path)
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".tmp") as tmp:
-        tmp_path = tmp.name
-        prompt_speech.save(tmp_path)
+        # Convert to required format
+        audio = AudioSegment.from_file(tmp_path)
+        audio = audio.set_channels(1).set_frame_rate(16000)
+        audio.export(prompt_path, format="wav", codec="pcm_s16le")
 
-    audio = AudioSegment.from_file(tmp_path)
-    audio = audio.set_channels(1).set_frame_rate(16000)
-    audio.export(prompt_path, format="wav", codec="pcm_s16le")
+        os.remove(tmp_path)
+        print(f"[{user_id}] Prompt saved and converted: {prompt_path}")
+        return {"message": "Prompt audio saved successfully"}
 
-    os.remove(tmp_path)
-    print(f"[{user_id}] 프롬프트 저장 및 변환 완료: {prompt_path}")
-    return jsonify({"message": "프롬프트 음성이 성공적으로 저장되었습니다."})
+@ns.route('/voice-clone')
+class VoiceClone(Resource):
+    @ns.expect(voice_clone_model)
+    def post(self):
+        """Generate voice clone from text"""
+        user_id = request.form.get("user_id")
+        text = request.form.get("text")
 
-@app.route("/voice-clone", methods=["POST"])
-def voice_clone():
-    user_id = request.form.get("user_id")
-    text = request.form.get("text")
+        if not user_id or not text:
+            return {"error": "user_id and text are required"}, 400
 
-    if not user_id or not text:
-        return jsonify({"error": "user_id와 text는 필수입니다."}), 400
+        try:
+            output_path = generate_tts(user_id, text)
+            filename = os.path.basename(output_path)
 
-    try:
-        output_path = generate_tts(user_id, text)
-        filename = os.path.basename(output_path)
-
-        # 파일명을 헤더에 포함하여 전송
-        response = send_file(
-            output_path,
-            mimetype="audio/wav",
-            as_attachment=True,
-            download_name=filename
-        )
-        
-        # 파일명을 헤더에 추가
-        response.headers['X-Filename'] = filename
-        response.headers['X-Filepath'] = output_path
-        
-        return response
-
-    except FileNotFoundError as e:
-        return jsonify({"error": str(e)}), 404
-    
-@app.route('/results/<user_id>/<filename>')
-def serve_generated_audio(user_id, filename):
-    path = os.path.join(SAVE_DIR, user_id)
-    return send_from_directory(path, filename)
-
-@app.route('/file/<path:file_path>')
-def serve_file_by_path(file_path):
-    """파일 경로로 파일을 제공하는 엔드포인트"""
-    try:
-        # 보안을 위해 SAVE_DIR 내의 파일만 접근 가능하도록 제한
-        full_path = os.path.join(SAVE_DIR, file_path)
-        if not os.path.abspath(full_path).startswith(os.path.abspath(SAVE_DIR)):
-            return jsonify({"error": "접근할 수 없는 경로입니다."}), 403
-        
-        if not os.path.exists(full_path):
-            return jsonify({"error": "파일을 찾을 수 없습니다."}), 404
+            response = send_file(
+                output_path,
+                mimetype="audio/wav",
+                as_attachment=True,
+                download_name=filename
+            )
             
-        directory = os.path.dirname(full_path)
-        filename = os.path.basename(full_path)
-        return send_from_directory(directory, filename)
-        
-    except Exception as e:
-        return jsonify({"error": f"파일 제공 중 오류가 발생했습니다: {str(e)}"}), 500
-    
-    
-@app.route("/voice-list", methods=["POST"])
-def voice_list():
-    data = request.get_json()
-    user_id = data.get("user_id")
+            response.headers['X-Filename'] = filename
+            response.headers['X-Filepath'] = output_path
+            
+            return response
 
-    if not user_id:
-        return jsonify({"error": "user_id는 필수입니다."}), 400
+        except FileNotFoundError as e:
+            return {"error": str(e)}, 404
 
-    user_dir = os.path.join(SAVE_DIR, user_id)
+@ns.route('/results/<user_id>/<filename>')
+class ServeAudio(Resource):
+    def get(self, user_id, filename):
+        """Serve generated audio files"""
+        path = os.path.join(SAVE_DIR, user_id)
+        return send_file(os.path.join(path, filename))
 
-    if not os.path.exists(user_dir):
-        return jsonify({"voices": []})
+@ns.route('/voice-list')
+class VoiceList(Resource):
+    @ns.expect(voice_list_model)
+    @ns.marshal_with(voice_list_response)
+    def post(self):
+        """Get list of generated voices for a user"""
+        data = request.get_json()
+        user_id = data.get("user_id")
 
-    files = sorted(
-        [f for f in os.listdir(user_dir) if f.endswith(".wav")],
-        reverse=True
-    )
+        if not user_id:
+            return {"error": "user_id is required"}, 400
 
-    file_urls = [f"/static/results/{user_id}/{f}" for f in files]
+        user_dir = os.path.join(SAVE_DIR, user_id)
 
-    return jsonify({"voices": file_urls})
+        if not os.path.exists(user_dir):
+            return {"voices": []}
+
+        files = sorted(
+            [f for f in os.listdir(user_dir) if f.endswith(".wav")],
+            reverse=True
+        )
+
+        file_urls = [f"/api/tts/results/{user_id}/{f}" for f in files]
+        return {"voices": file_urls}
+
+@ns.route('/health')
+class HealthCheck(Resource):
+    def get(self):
+        """Health check endpoint"""
+        return {"status": "healthy", "device": str(device)}
 
 if __name__ == "__main__":
-    print("Flask 서버 시작 중…")
-    app.run(host="0.0.0.0", port=5000)
+    print("Starting Flask server...")
+    print("=" * 50)
+    print("🚀 Voice NFT Trading Platform - TTS API")
+    print("=" * 50)
+    print(f"📊 Swagger UI: http://localhost:5000/swagger/")
+    print(f"🔧 API Base: http://localhost:5000/api/")
+    print(f"💻 Device: {device}")
+    print("=" * 50)
+    app.run(host="0.0.0.0", port=5000, debug=False)

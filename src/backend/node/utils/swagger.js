@@ -121,9 +121,9 @@ const options = {
         security: [{ bearerAuth: [] }],
     },
     apis: [
-        path.join(__dirname, '../oauth/routes/*.js'),
-        path.join(__dirname, '../NFT/routes/*.js'),
-        path.join(__dirname, '../payment/routes/*.js'),
+        path.join(__dirname, '../auth/routes/*.js'),
+        path.join(__dirname, '../marketplace/api/routes/*.js'),
+        path.join(__dirname, '../voice/routes/*.js'),
     ],
 };
 

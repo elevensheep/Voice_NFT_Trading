@@ -1,0 +1,18 @@
+{
+  "name": "voice-nft-smart-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for Voice NFT Trading Platform",
+  "scripts": {
+    "deploy": "node ../scripts/deploy-contract.js",
+    "migrate": "truffle migrate --reset",
+    "compile": "truffle compile",
+    "test": "truffle test"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.6",
+    "@truffle/hdwallet-provider": "^2.1.15"
+  },
+  "devDependencies": {
+    "solc": "^0.8.30"
+  }
+}
