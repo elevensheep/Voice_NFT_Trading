@@ -139,7 +139,7 @@ npm run deploy
 
 ## 📋 주요 API 엔드포인트
 
-### Node.js 백엔드 API (포트 8000)
+### Node.js 백엔드 API (포트 8000)[Swagger UI](http://localhost:8000/api-docs)
 #### 인증 (Authentication)
 - `POST /api/auth/kakao` - 카카오 로그인
 - `POST /api/auth/complete-profile` - 프로필 완성
